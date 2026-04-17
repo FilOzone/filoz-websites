@@ -1,5 +1,5 @@
 ---
-import { getCollection, render } from 'astro:content'
+import { getCollection, render, type CollectionEntry } from 'astro:content'
 import type { GetStaticPaths } from 'astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import GridAnimation from '../../components/GridAnimation.astro'
@@ -12,7 +12,11 @@ export const getStaticPaths: GetStaticPaths = async () => {
   }))
 }
 
-const { post } = Astro.props
+interface Props {
+  post: CollectionEntry<'blog'>
+}
+
+const { post } = Astro.props as Props
 const { Content } = await render(post)
 const wfPage = post.data.wf_page ?? '66d8ad27d0cac9d775e009ad'
 const formattedDate = post.data.date.toLocaleDateString('en-US', {
@@ -36,7 +40,7 @@ const formattedDate = post.data.date.toLocaleDateString('en-US', {
                                 <div class="margin-bottom margin-small"><img src="/images/logos/symbol.svg" loading="lazy" style="opacity: 1; transform: translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(0deg) skew(0deg, 0deg); transform-style: preserve-3d; will-change: transform;" data-w-id="ca089ab9-3bbc-4947-7087-52763d0f170c" alt="logo" class="main-icon"></div>
                                 <div data-w-id="ca089ab9-3bbc-4947-7087-52763d0f170d" style="opacity: 1;" class="margin-bottom margin-small">
                                     <div class="w-layout-hflex flex-first-title">
-                                        <h1 class="heading-style-h1 bold-header">FilOz Blog<br></h1>
+                                        <h2 class="heading-style-h1 bold-header">FilOz Blog<br></h2>
                                     </div>
                                 </div>
                                 <div class="margin-top margin-xmedium">

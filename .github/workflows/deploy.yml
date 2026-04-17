@@ -71,6 +71,10 @@ jobs:
         working-directory: sites/${{ matrix.site }}
         run: |
           npm ci
+          # Run astro check only if the site's package.json declares a `check` script
+          if jq -e '.scripts.check' package.json >/dev/null 2>&1; then
+            npm run check
+          fi
           npm run build
 
       - name: Deploy to FOC

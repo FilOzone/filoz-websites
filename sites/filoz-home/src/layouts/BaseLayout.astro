@@ -20,7 +20,17 @@ const pageTitle = title ? `${title} | FilOz` : 'FilOz'
 const metaDescription = description ?? SITE_DESCRIPTION
 const ogTitle = title ?? 'FilOz'
 const isBlog = section === 'blog'
-const canonical = new URL(Astro.url.pathname, Astro.site).href
+
+// Normalise canonical: always with trailing slash so /events and /events/ don't emit different canonicals
+const canonPath = Astro.url.pathname === '/'
+  ? '/'
+  : (Astro.url.pathname.endsWith('/') ? Astro.url.pathname : Astro.url.pathname + '/')
+const canonical = new URL(canonPath, Astro.site).href
+
+// Staging builds noindex by default; set PROD_BUILD=1 to opt into search engine indexing.
+// Runtime host detection doesn't work in static SSG (hostname baked at build time), so this
+// is an explicit build-time flag. CI sets it only for production deploys.
+const isStaging = import.meta.env.PROD_BUILD !== '1'
 ---
 <!DOCTYPE html>
 <html data-wf-domain="www.filoz.org" data-wf-page={wfPage} data-wf-site="66a2ad2993901f5253eecd05" lang="en">
@@ -41,6 +51,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href
     <meta content="summary_large_image" name="twitter:card">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <link rel="canonical" href={canonical}>
+    {isStaging && <meta name="robots" content="noindex, nofollow" />}
+
+    <!-- Fallback for users with JS disabled: Webflow IX2 sets elements to opacity:0 until JS runs; show them if no JS. -->
+    <noscript><style>[data-w-id],[style*="opacity:0"],[style*="opacity: 0"]{opacity:1 !important;filter:none !important;transform:none !important;}</style></noscript>
 
     <!-- Webflow CSS -->
     <link href="/css/webflow.css" rel="stylesheet" type="text/css">
@@ -67,9 +81,6 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href
     <!-- Favicon -->
     <link href="/images/tab-bg.png" rel="shortcut icon" type="image/x-icon"/>
     <link href="/images/tab-bg.png" rel="apple-touch-icon"/>
-
-    <!-- [Attributes by Finsweet] CMS Slider -->
-    <script async src="/js/cmsslider.js"></script>
 </head>
 <body class="body">
     <div class="page-wrapper">
@@ -81,8 +92,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href
         </main>
     </div>
 
-    <!-- jQuery -->
+    <!-- jQuery (loads before Webflow + CMS Slider, both depend on it) -->
     <script is:inline src="/js/jquery-3.5.1.min.js"></script>
+    <!-- [Attributes by Finsweet] CMS Slider - depends on jQuery, loads after it -->
+    <script is:inline defer src="/js/cmsslider.js"></script>
     <!-- Webflow JS chunks -->
     <script is:inline src="/js/webflow.schunk.36b8fb49256177c8.js"></script>
     <script is:inline src="/js/webflow.schunk.8208d3e53b97e3c7.js"></script>
