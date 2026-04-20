@@ -117,7 +117,7 @@ jobs:
           fi
           npm install -g pnpm@10
           cd /tmp/synapse-sdk
-          pnpm install --frozen-lockfile
+          pnpm install
           # Build just the docs site — typedoc runs during this build and
           # emits src/content/docs/reference/*.
           cd docs
