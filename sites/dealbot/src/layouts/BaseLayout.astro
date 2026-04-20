@@ -1,0 +1,27 @@
+---
+interface Props {
+  title?: string
+  description?: string
+}
+const {
+  title = 'DealBot — Filecoin storage deal analytics',
+  description = 'Live performance metrics for automated Filecoin storage deals across Synapse storage providers.',
+} = Astro.props
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <script is:inline src="/runtime-config.js"></script>
+  </head>
+  <body>
+    <div id="root">
+      <slot />
+    </div>
+  </body>
+</html>

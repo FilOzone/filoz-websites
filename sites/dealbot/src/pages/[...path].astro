@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { Root } from '../Root.tsx'
+
+export function getStaticPaths() {
+  return ['new'].map((p) => ({ params: { path: p } }))
+}
+---
+<BaseLayout>
+  <Root client:only="react" />
+</BaseLayout>

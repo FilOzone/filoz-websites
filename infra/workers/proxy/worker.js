@@ -19,6 +19,16 @@ const D1_BY_HOST = {
   'calibration.dashboard.filbeam.com': 'D1_CALIBRATION',
 }
 
+// Per-host API passthrough. The worker proxies /api/* requests to the configured
+// upstream, adds CORS headers, and returns the response. Used for sites whose
+// backend lives on a separate origin (e.g. NestJS backend for dealbot).
+const API_PROXY_BY_HOST = {
+  'dealbot.filecoincloud.io': 'https://dealbot.filoz.org',
+  'staging.dealbot.filecoincloud.io': 'https://staging.dealbot.filoz.org',
+  'dealbot.filoz.org': 'https://dealbot.filoz.org',
+  'staging.dealbot.filoz.org': 'https://staging.dealbot.filoz.org',
+}
+
 // Named queries served from /api/<name>.json. Cached at the edge.
 const QUERIES = {
   'platform-stats': {
@@ -193,6 +203,11 @@ export default {
 }
 
 async function handleApi(request, env, ctx, host, path, search) {
+  const proxyBase = API_PROXY_BY_HOST[host]
+  if (proxyBase) {
+    return proxyApi(request, ctx, proxyBase, path, search)
+  }
+
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response('Method not allowed', { status: 405 })
   }
@@ -275,6 +290,54 @@ async function runD1Raw(env, dbId, q, params) {
   }
   const json = await res.json()
   return json.result[0].results
+}
+
+async function proxyApi(request, ctx, upstreamBase, path, search) {
+  const upstream = `${upstreamBase}${path}${search.toString() ? `?${search}` : ''}`
+
+  const reqHeaders = new Headers()
+  for (const [k, v] of request.headers) {
+    const kl = k.toLowerCase()
+    if (kl === 'host' || kl === 'cf-connecting-ip' || kl.startsWith('cf-') || kl === 'x-forwarded-host') continue
+    reqHeaders.set(k, v)
+  }
+
+  const upstreamReq = new Request(upstream, {
+    method: request.method,
+    headers: reqHeaders,
+    body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+    redirect: 'follow',
+  })
+
+  let upstreamRes
+  try {
+    upstreamRes = await fetch(upstreamReq, { cf: { cacheTtl: 30, cacheEverything: false } })
+  } catch (err) {
+    return new Response(`upstream API error: ${err.message}`, {
+      status: 502,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' },
+    })
+  }
+
+  const resHeaders = new Headers()
+  for (const [k, v] of upstreamRes.headers) {
+    const kl = k.toLowerCase()
+    if (kl === 'access-control-allow-origin' || kl === 'access-control-allow-credentials' || kl === 'access-control-allow-methods' || kl === 'access-control-allow-headers' || kl === 'set-cookie' || kl === 'server' || kl === 'cf-ray') continue
+    resHeaders.set(k, v)
+  }
+  resHeaders.set('access-control-allow-origin', '*')
+  resHeaders.set('access-control-allow-methods', 'GET, HEAD, POST, OPTIONS')
+  resHeaders.set('access-control-allow-headers', 'content-type, authorization')
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: resHeaders })
+  }
+
+  return new Response(upstreamRes.body, {
+    status: upstreamRes.status,
+    statusText: upstreamRes.statusText,
+    headers: resHeaders,
+  })
 }
 
 async function cacheWrap(request, ctx, fn) {

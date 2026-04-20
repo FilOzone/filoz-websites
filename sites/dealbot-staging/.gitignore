@@ -1,0 +1,8 @@
+.DS_Store
+.astro/
+/dist/
+node_modules/
+yarn-error.log
+.env.production
+!.env
+nova-output.json
