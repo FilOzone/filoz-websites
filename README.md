@@ -1,19 +1,19 @@
 # filoz-websites
 
-Mono-repo for FilOz web properties. Same architecture as [foc-websites](https://github.com/TippyFlitsUK/foc-websites) — each site is an [Astro](https://astro.build) project under `sites/`, deployed to Filecoin Onchain Cloud via [Nova](https://github.com/FilOzone/filecoin-nova), and served through a shared Cloudflare Worker proxy with an ENS fallback.
+Mono-repo for FilOz web properties. Same architecture as [foc-websites](https://github.com/TippyFlitsUK/foc-websites) — each site is an [Astro](https://astro.build) project under `sites/`, deployed to Filecoin Onchain Cloud by [filecoin-nova](https://github.com/FilOzone/filecoin-nova).
 
 Plan + rollout tracker: [FilOzone/tpm-utils#2](https://github.com/FilOzone/tpm-utils/issues/2)
 
 ## Architecture
 
-Identical to foc-websites. Both repos deploy against the same Cloudflare Worker (`foc-gateway-proxy`) and the same KV namespace — the Worker resolves `CIDS[hostname]` per request, so each site's deploys update only its own KV key.
+```
+Browser → *.filoz.org (prod) / *.filecoincloud.io (staging)
+        → Cloudflare edge → Worker → KV[hostname] → current CID
+        → fallback IPFS gateways: dweb.link → ipfs.io → 4everland.io
+        → FOC-pinned content
+```
 
-```
-Browser -> *.filoz.org (prod) / *.filecoincloud.io (staging)
-        -> Cloudflare edge -> Worker -> KV[hostname]
-        -> fallback IPFS gateways: dweb.link -> ipfs.io -> 4everland.io
-        -> FOC-pinned content
-```
+Both the Worker and the deploy pipeline live in [filecoin-nova](https://github.com/FilOzone/filecoin-nova). This repo only carries site content.
 
 ENS fallback: `*.filnova.eth` (staging) / `*.filoz.eth` (prod), resolvable via `eth.limo`.
 
@@ -21,39 +21,75 @@ ENS fallback: `*.filnova.eth` (staging) / `*.filoz.eth` (prod), resolvable via `
 
 ```
 filoz-websites/
-  infra/workers/proxy/            copy of foc-websites worker infra
-  sites/<name>/                   one Astro project per site
-    deploy.json                   per-site zone / hostname / ENS name
+  .github/workflows/deploy.yml   10-line caller for nova's reusable workflow
+  sites/<name>/
+    deploy.json                   hostname + cf_zone_id + ens_name
+    package.json                  build scripts
+    src/, public/                 site content
 ```
-
-See [`infra/workers/proxy/README.md`](infra/workers/proxy/README.md) for the Worker + deploy scripts.
 
 ## Sites
 
-| Site | Production | Staging | Status |
+| Site | Production | Staging | ENS |
 |---|---|---|---|
-| FilOz Home | filoz.org | filoz.filecoincloud.io | Pending (source: Hugo Webflow clone at `filoz-home-desite`) |
-| DealBot | dealbot.filoz.org | dealbot.filecoincloud.io | Pending |
-| DealBot Staging | staging.dealbot.filoz.org | dealbot-staging.filecoincloud.io | Pending |
+| filoz-home | filoz.org | filoz.filecoincloud.io | filoz.filnova.eth |
+| dealbot | dealbot.filoz.org | dealbot.filecoincloud.io | dealbot.filnova.eth |
+| dealbot-staging | staging.dealbot.filoz.org | dealbot-staging.filecoincloud.io | dealbot-staging.filnova.eth |
+
+## Development
+
+```bash
+cd sites/<name>
+npm install
+npm run dev
+npm run build
+```
 
 ## Deploy
 
-Same flow as foc-websites:
+Push to `main` touching `sites/**`. CI calls filecoin-nova's reusable workflow which builds each changed site, pins to FOC, updates KV, DNSLink, and ENS.
 
-```bash
-export CLOUDFLARE_API_TOKEN=...
-cd sites/<name>
-npm run build
-CID=$(nova deploy dist --json | jq -r .cid)              # never use --clean
-../../infra/workers/proxy/deploy-site.sh <name> "$CID"
-../../infra/workers/proxy/dnslink.sh <name> "$CID"
-NOVA_RPC_URL=https://ethereum-rpc.publicnode.com \
-  nova ens "$CID" --ens $(jq -r .ens_name deploy.json)
+`.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy
+on:
+  push: { branches: [main], paths: ['sites/**'] }
+  workflow_dispatch:
+jobs:
+  deploy:
+    uses: FilOzone/filecoin-nova/.github/workflows/deploy-sites.yml@v0.7.6
+    secrets:
+      NOVA_PIN_KEY:         ${{ secrets.NOVA_PIN_KEY }}
+      NOVA_WALLET_ADDRESS:  ${{ secrets.NOVA_WALLET_ADDRESS }}
+      NOVA_ENS_KEY:         ${{ secrets.NOVA_ENS_KEY }}
+      NOVA_RPC_URL:         ${{ secrets.NOVA_RPC_URL }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
+
+Repo variables (for reusing FOC's existing `foc-gateway-proxy` Worker rather than spinning up a new one per-repo):
+
+```
+NOVA_WORKER_NAME       = foc-gateway-proxy
+NOVA_KV_NAMESPACE_ID   = 6f6e9038f48742e7b7e4a7de8733460a
+NOVA_WORKER_UPLOAD     = skip
 ```
 
 Required GitHub secrets: `NOVA_PIN_KEY`, `NOVA_WALLET_ADDRESS`, `NOVA_ENS_KEY`, `NOVA_RPC_URL`, `CLOUDFLARE_API_TOKEN`.
 
+## Per-site `deploy.json`
+
+```json
+{
+  "hostname": "dealbot.filecoincloud.io",
+  "cf_zone_id": "ec64112d49365c91cf3c8db1424b5632",
+  "ens_name": "dealbot.filnova.eth"
+}
+```
+
+Optional extras: `"dist": "site"` for pre-built sites, `"apiProxy": { "/api": "https://dealbot.filoz.org" }` for reverse-proxied API routes.
+
 ## Special considerations
 
-- **DealBot** frontend is a React SPA calling a backend API. `API_BASE_URL` must be set to an absolute backend URL at build time — same-origin won't work from IPFS. Backend stays on current infrastructure (`77.42.75.71`).
-- **FilOz Home** rebuilds a Webflow site; Webflow IX2 animations depend on `data-wf-page` attributes — preserve them per page during the Hugo → Astro port.
+- **dealbot** frontend is a React SPA calling a backend API. The shared Worker proxies `/api/*` to the NestJS backend at `dealbot.filoz.org` / `staging.dealbot.filoz.org` — same-origin from the browser's perspective, no CORS.
+- **filoz-home** rebuilds a Webflow site; Webflow IX2 animations depend on `data-wf-page` attributes — preserve them per page during the Hugo → Astro port.
