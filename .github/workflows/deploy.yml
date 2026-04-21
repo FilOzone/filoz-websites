@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 jobs:
   deploy:
-    uses: FilOzone/filecoin-nova/.github/workflows/deploy-sites.yml@v0.7.7
+    uses: FilOzone/filecoin-nova/.github/workflows/deploy-sites.yml@v0.7.9
     # Cross-org call (FilOzone ↔ TippyFlitsUK): `inherit` silently drops
     # secrets, so each one must be explicit-mapped.
     secrets:
