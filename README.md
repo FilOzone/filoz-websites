@@ -32,9 +32,9 @@ filoz-websites/
 
 | Site | Production | Staging | ENS |
 |---|---|---|---|
-| filoz-home | filoz.org | filoz.filecoincloud.io | filoz.filnova.eth |
-| dealbot | dealbot.filoz.org | dealbot.filecoincloud.io | dealbot.filnova.eth |
-| dealbot-staging | staging.dealbot.filoz.org | dealbot-staging.filecoincloud.io | dealbot-staging.filnova.eth |
+| filoz-home | [filoz.org](https://filoz.org) | [filoz.filecoincloud.io](https://filoz.filecoincloud.io) | [filoz.filnova.eth](https://filoz.filnova.eth.limo) |
+| dealbot | [dealbot.filoz.org](https://dealbot.filoz.org) | [dealbot.filecoincloud.io](https://dealbot.filecoincloud.io) | [dealbot.filnova.eth](https://dealbot.filnova.eth.limo) |
+| dealbot-staging | [staging.dealbot.filoz.org](https://staging.dealbot.filoz.org) | [dealbot-staging.filecoincloud.io](https://dealbot-staging.filecoincloud.io) | [dealbot-staging.filnova.eth](https://dealbot-staging.filnova.eth.limo) |
 
 ## Development
 
