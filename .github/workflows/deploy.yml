@@ -4,9 +4,17 @@ on:
     branches: [main]
     paths: ['sites/**']
   workflow_dispatch:
+    inputs:
+      site:
+        type: string
+        required: false
+        default: ""
+        description: "Restrict matrix to a single site (directory name). Empty = all sites."
 jobs:
   deploy:
     uses: FilOzone/filecoin-nova/.github/workflows/deploy-sites.yml@v0.7.11
+    with:
+      site: ${{ inputs.site }}
     # Cross-org call (FilOzone ↔ TippyFlitsUK): `inherit` silently drops
     # secrets, so each one must be explicit-mapped.
     #
